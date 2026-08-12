@@ -2,19 +2,13 @@
 styles.py
 ---------
 Central place for custom CSS so every page in the app looks consistent.
-
 Usage in any page file:
-
     from utils.styles import load_custom_css, banner, section_title
-
     load_custom_css()          # call once near the top of the page
     section_title("My Books")  # styled heading
     banner("2 books overdue", kind="overdue")
 """
-
 import streamlit as st
-
-
 def load_custom_css() -> None:
     """Inject the app-wide CSS. Call this once at the top of every page."""
     st.markdown(
@@ -25,7 +19,6 @@ def load_custom_css() -> None:
             padding-top: 2rem;
             padding-bottom: 3rem;
         }
-
         /* ---- Card used for each issued book ---- */
         .book-card {
             background-color: #ffffff;
@@ -42,7 +35,6 @@ def load_custom_css() -> None:
             color: #666666;
             font-size: 0.85rem;
         }
-
         /* ---- Reminder banners ---- */
         .cv-banner {
             border-radius: 10px;
@@ -65,7 +57,6 @@ def load_custom_css() -> None:
             color: #1e6b34;
             border: 1px solid #b6e3bd;
         }
-
         /* ---- Section titles ---- */
         .cv-section-title {
             font-size: 1.25rem;
@@ -79,13 +70,9 @@ def load_custom_css() -> None:
         """,
         unsafe_allow_html=True,
     )
-
-
 def section_title(text: str) -> None:
     """Styled section heading, used instead of a plain st.header()."""
     st.markdown(f'<div class="cv-section-title">{text}</div>', unsafe_allow_html=True)
-
-
 def banner(message: str, kind: str = "ok") -> None:
     """
     Render a colored banner.
@@ -96,10 +83,7 @@ def banner(message: str, kind: str = "ok") -> None:
         "upcoming": "cv-banner-upcoming",
         "ok": "cv-banner-ok",
     }.get(kind, "cv-banner-ok")
-
     st.markdown(f'<div class="cv-banner {css_class}">{message}</div>', unsafe_allow_html=True)
-
-
 def book_card(title: str, author: str, meta_line: str) -> None:
     """Consistent card layout for displaying a single book."""
     st.markdown(
@@ -112,3 +96,8 @@ def book_card(title: str, author: str, meta_line: str) -> None:
         """,
         unsafe_allow_html=True,
     )
+
+# Alias so pages that import `inject_library_styles` (an older/different
+# naming convention used elsewhere in the project) still work without
+# needing to rewrite those pages.
+inject_library_styles = load_custom_css
