@@ -1,4 +1,5 @@
 import streamlit as st
+from components.navbar import render_navbar
 
 # ---------- PAGE CONFIG ----------
 st.set_page_config(
@@ -7,6 +8,8 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="collapsed"
 )
+
+render_navbar()
 
 # ---------- CUSTOM STYLING ----------
 st.markdown("""
