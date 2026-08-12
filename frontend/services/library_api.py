@@ -67,10 +67,33 @@ _DUMMY_ISSUED_BOOKS: List[Dict] = [
     },
 ]
 
+# ---------------------------------------------------------------------------
+# DUMMY STUDENT PROFILE
+# Stand-in for a students collection/table until the backend is ready.
+# ---------------------------------------------------------------------------
+
+_DUMMY_STUDENT_PROFILE: Dict = {
+    "student_id": "UMIT2026045",
+    "name": "Kalpita Naik",
+    "department": "AI & Data Science",
+    "valid_till": datetime.date(2027, 6, 30),
+}
+
 
 # ---------------------------------------------------------------------------
 # PUBLIC STUB FUNCTIONS
 # ---------------------------------------------------------------------------
+
+def get_student_profile(student_id: str) -> Dict:
+    """
+    Return basic profile info for the digital library card.
+
+    TODO(backend): GET /api/students/<student_id>
+    """
+    profile = dict(_DUMMY_STUDENT_PROFILE)
+    profile["student_id"] = student_id  # reflect whichever ID was passed in
+    return profile
+
 
 def get_issued_books(student_id: str) -> List[Dict]:
     """
