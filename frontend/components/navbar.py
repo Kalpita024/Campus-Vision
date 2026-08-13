@@ -1,6 +1,6 @@
 import streamlit as st
 
-def render_navbar():
+def render_navbar(current_page: str = "") -> None:
     # ---------- SIDEBAR STYLING (matches app.py theme) ----------
     st.markdown("""
         <style>
