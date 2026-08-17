@@ -99,16 +99,18 @@ def get_student_profile(student_id: str = None) -> Dict:
     return profile
 
 
-def get_issued_books(student_id: str) -> List[Dict]:
+def get_issued_books(student_id: str = None) -> List[Dict]:
     """
     Return all currently-issued (not yet returned) books for a student.
+    student_id is optional for now since the dummy data isn't per-student yet;
+    pages can call this with no arguments (get_issued_books()) or pass one.
 
     TODO(backend): GET /api/library/issued/<student_id>
     """
     return [b for b in _DUMMY_ISSUED_BOOKS if not b["returned"]]
 
 
-def get_due_reminders(student_id: str, upcoming_window_days: int = 3) -> Dict[str, List[Dict]]:
+def get_due_reminders(student_id: str = None, upcoming_window_days: int = 3) -> Dict[str, List[Dict]]:
     """
     Split issued books into 'overdue' and 'upcoming' (due within
     `upcoming_window_days` days). Used by due_reminders.py to build banners.
