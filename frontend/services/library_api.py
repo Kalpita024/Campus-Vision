@@ -31,10 +31,6 @@ BASE_URL = "http://localhost:5000"  # TODO: update once backend teammate shares 
 
 # ---------------------------------------------------------------------------
 # DUMMY "DATABASE"
-# In-memory list acting as a stand-in for the issued_book collection/table.
-# Streamlit re-runs the script on every interaction, so this resets each
-# session — that's expected for now. Session-state usage happens in the
-# page files (e.g. extend_date.py), not here.
 # ---------------------------------------------------------------------------
 
 _DUMMY_ISSUED_BOOKS: List[Dict] = [
@@ -42,6 +38,7 @@ _DUMMY_ISSUED_BOOKS: List[Dict] = [
         "book_id": "B001",
         "title": "Introduction to Algorithms",
         "author": "Cormen, Leiserson, Rivest, Stein",
+        "isbn": "978-0262046305",
         "issue_date": datetime.date(2026, 7, 22),
         "due_date": datetime.date(2026, 8, 9),   # overdue relative to "today" for demo
         "renewed": False,
@@ -51,6 +48,7 @@ _DUMMY_ISSUED_BOOKS: List[Dict] = [
         "book_id": "B002",
         "title": "Clean Code",
         "author": "Robert C. Martin",
+        "isbn": "978-0132350884",
         "issue_date": datetime.date(2026, 8, 1),
         "due_date": datetime.date(2026, 8, 13),  # due soon
         "renewed": False,
@@ -60,6 +58,7 @@ _DUMMY_ISSUED_BOOKS: List[Dict] = [
         "book_id": "B003",
         "title": "Deep Learning",
         "author": "Ian Goodfellow",
+        "isbn": "978-0262035613",
         "issue_date": datetime.date(2026, 7, 15),
         "due_date": datetime.date(2026, 8, 25),  # comfortably not due yet
         "renewed": False,
@@ -69,14 +68,18 @@ _DUMMY_ISSUED_BOOKS: List[Dict] = [
 
 # ---------------------------------------------------------------------------
 # DUMMY STUDENT PROFILE
-# Stand-in for a students collection/table until the backend is ready.
 # ---------------------------------------------------------------------------
 
 _DUMMY_STUDENT_PROFILE: Dict = {
     "student_id": "UMIT2026045",
     "name": "Kalpita Naik",
+    "roll_no": "45",
+    "photo_initials": "KN",
     "department": "AI & Data Science",
-    "valid_till": datetime.date(2027, 6, 30),
+    "year": "3rd Year",
+    "email": "kalpita.naik@umit.edu.in",
+    "phone": "+91 98765 43210",
+    "membership_valid_till": datetime.date(2027, 6, 30),
 }
 
 
@@ -84,35 +87,33 @@ _DUMMY_STUDENT_PROFILE: Dict = {
 # PUBLIC STUB FUNCTIONS
 # ---------------------------------------------------------------------------
 
-def get_student_profile(student_id: str) -> Dict:
+def get_student_profile(student_id: str = None) -> Dict:
     """
     Return basic profile info for the digital library card.
 
     TODO(backend): GET /api/students/<student_id>
     """
     profile = dict(_DUMMY_STUDENT_PROFILE)
-    profile["student_id"] = student_id  # reflect whichever ID was passed in
+    if student_id:
+        profile["student_id"] = student_id
     return profile
 
 
-def get_issued_books(student_id: str) -> List[Dict]:
+def get_issued_books(student_id: str = None) -> List[Dict]:
     """
     Return all currently-issued (not yet returned) books for a student.
+    student_id is optional for now since the dummy data isn't per-student yet;
+    pages can call this with no arguments (get_issued_books()) or pass one.
 
     TODO(backend): GET /api/library/issued/<student_id>
     """
-    # student_id is unused for now since the dummy data isn't per-student;
-    # keep the parameter so the real API call already has the right signature.
     return [b for b in _DUMMY_ISSUED_BOOKS if not b["returned"]]
 
 
-def get_due_reminders(student_id: str, upcoming_window_days: int = 3) -> Dict[str, List[Dict]]:
+def get_due_reminders(student_id: str = None, upcoming_window_days: int = 3) -> Dict[str, List[Dict]]:
     """
     Split issued books into 'overdue' and 'upcoming' (due within
     `upcoming_window_days` days). Used by due_reminders.py to build banners.
-
-    TODO(backend): could become GET /api/library/reminders/<student_id>
-    or stay client-side if the backend just returns issued_books with dates.
     """
     today = datetime.date.today()
     books = get_issued_books(student_id)
@@ -123,6 +124,28 @@ def get_due_reminders(student_id: str, upcoming_window_days: int = 3) -> Dict[st
         if today <= b["due_date"] <= today + datetime.timedelta(days=upcoming_window_days)
     ]
     return {"overdue": overdue, "upcoming": upcoming}
+
+
+def get_book_status(due_date: datetime.date, upcoming_window_days: int = 3) -> str:
+    """
+    Classify a single due_date as one of: "overdue", "due_soon", "ok".
+    Used by pages (e.g. Issued_Books) to show a status badge per book.
+    """
+    today = datetime.date.today()
+    if due_date < today:
+        return "overdue"
+    if due_date <= today + datetime.timedelta(days=upcoming_window_days):
+        return "due_soon"
+    return "ok"
+
+
+def days_remaining(due_date: datetime.date) -> int:
+    """
+    Days left until due_date. Negative if already overdue.
+    e.g. due in 3 days -> 3, overdue by 2 days -> -2.
+    """
+    today = datetime.date.today()
+    return (due_date - today).days
 
 
 def extend_due_date(book_id: str, extra_days: int = 7) -> Dict:

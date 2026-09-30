@@ -42,4 +42,8 @@ def show_due_reminders(student_id: str, upcoming_window_days: int = 3) -> None:
         )
 
     if not overdue_books and not upcoming_books:
-        banner("You're all caught up — no books overdue or due soon. 🎉", kind="ok")
+<<<<<<< HEAD
+               banner("You're all caught up — no books overdue or due soon. 🎉", kind="ok")
+=======
+               banner("You're all caught up — no books overdue or due soon. 🎉", kind="ok")
+>>>>>>> 17bd8a50e39d1bd02cef5d3f8d94a2d8402eb17a
