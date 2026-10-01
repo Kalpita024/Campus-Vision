@@ -38,8 +38,9 @@ _DUMMY_ISSUED_BOOKS: List[Dict] = [
         "book_id": "B001",
         "title": "Introduction to Algorithms",
         "author": "Cormen, Leiserson, Rivest, Stein",
+        "isbn": "978-0262046305",
         "issue_date": datetime.date(2026, 7, 22),
-        "due_date": datetime.date(2026, 8, 9),
+        "due_date": datetime.date(2026, 8, 9),   # overdue relative to "today" for demo
         "renewed": False,
         "returned": False,
     },
@@ -47,8 +48,9 @@ _DUMMY_ISSUED_BOOKS: List[Dict] = [
         "book_id": "B002",
         "title": "Clean Code",
         "author": "Robert C. Martin",
+        "isbn": "978-0132350884",
         "issue_date": datetime.date(2026, 8, 1),
-        "due_date": datetime.date(2026, 8, 13),
+        "due_date": datetime.date(2026, 8, 13),  # due soon
         "renewed": False,
         "returned": False,
     },
@@ -56,8 +58,9 @@ _DUMMY_ISSUED_BOOKS: List[Dict] = [
         "book_id": "B003",
         "title": "Deep Learning",
         "author": "Ian Goodfellow",
+        "isbn": "978-0262035613",
         "issue_date": datetime.date(2026, 7, 15),
-        "due_date": datetime.date(2026, 8, 25),
+        "due_date": datetime.date(2026, 8, 25),  # comfortably not due yet
         "renewed": False,
         "returned": False,
     },
@@ -79,6 +82,7 @@ _DUMMY_STUDENT_PROFILE: Dict = {
     "membership_valid_till": datetime.date(2027, 6, 30),
 }
 
+
 # ---------------------------------------------------------------------------
 # PUBLIC STUB FUNCTIONS
 # ---------------------------------------------------------------------------
@@ -95,16 +99,18 @@ def get_student_profile(student_id: str = None) -> Dict:
     return profile
 
 
-def get_issued_books(student_id: str) -> List[Dict]:
+def get_issued_books(student_id: str = None) -> List[Dict]:
     """
     Return all currently-issued (not yet returned) books for a student.
+    student_id is optional for now since the dummy data isn't per-student yet;
+    pages can call this with no arguments (get_issued_books()) or pass one.
 
     TODO(backend): GET /api/library/issued/<student_id>
     """
     return [b for b in _DUMMY_ISSUED_BOOKS if not b["returned"]]
 
 
-def get_due_reminders(student_id: str, upcoming_window_days: int = 3) -> Dict[str, List[Dict]]:
+def get_due_reminders(student_id: str = None, upcoming_window_days: int = 3) -> Dict[str, List[Dict]]:
     """
     Split issued books into 'overdue' and 'upcoming' (due within
     `upcoming_window_days` days). Used by due_reminders.py to build banners.
@@ -120,9 +126,35 @@ def get_due_reminders(student_id: str, upcoming_window_days: int = 3) -> Dict[st
     return {"overdue": overdue, "upcoming": upcoming}
 
 
+def get_book_status(due_date: datetime.date, upcoming_window_days: int = 3) -> str:
+    """
+    Classify a single due_date as one of: "overdue", "due_soon", "ok".
+    Used by pages (e.g. Issued_Books) to show a status badge per book.
+    """
+    today = datetime.date.today()
+    if due_date < today:
+        return "overdue"
+    if due_date <= today + datetime.timedelta(days=upcoming_window_days):
+        return "due_soon"
+    return "ok"
+
+
+def days_remaining(due_date: datetime.date) -> int:
+    """
+    Days left until due_date. Negative if already overdue.
+    e.g. due in 3 days -> 3, overdue by 2 days -> -2.
+    """
+    today = datetime.date.today()
+    return (due_date - today).days
+
+
 def extend_due_date(book_id: str, extra_days: int = 7) -> Dict:
     """
     Extend (renew) a book's due date by `extra_days`, once only.
+
+    Returns: {"success": bool, "message": str, "new_due_date": date | None}
+
+    TODO(backend): POST /api/library/extend  body: {book_id, extra_days}
     """
     for b in _DUMMY_ISSUED_BOOKS:
         if b["book_id"] == book_id:
