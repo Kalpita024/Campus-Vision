@@ -58,4 +58,8 @@ def init_db():
 # Call db.init_app(app) and db.create_all() in app.py (see app.py).
 # ---------------------------------------------------------------------------
 
+<<<<<<< HEAD
 db = SQLAlchemy()
+=======
+db = SQLAlchemy()
+>>>>>>> 751e69addd94e88a833e10393b452e3551ec0335
