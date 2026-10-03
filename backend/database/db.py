@@ -1,7 +1,14 @@
 import sqlite3
 import os
 
+from flask_sqlalchemy import SQLAlchemy
+
 DB_PATH = os.path.join(os.path.dirname(__file__), "campusvision.db")
+
+# ---------------------------------------------------------------------------
+# Raw sqlite3 connection — used by Person 1 (setup) and Person 3
+# (reminders/extend endpoints), on the `students` and `issued_books` tables.
+# ---------------------------------------------------------------------------
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -43,3 +50,12 @@ def init_db():
 
     conn.commit()
     conn.close()
+
+
+# ---------------------------------------------------------------------------
+# SQLAlchemy object — used by Person 2's models/book.py (the `books` table).
+# Points at the SAME campusvision.db file as the raw-sqlite3 code above.
+# Call db.init_app(app) and db.create_all() in app.py (see app.py).
+# ---------------------------------------------------------------------------
+
+db = SQLAlchemy()
