@@ -1,41 +1,72 @@
+import sqlite3
 import streamlit as st
-from components.navbar import render_navbar
-from services.library_api import get_student_profile, get_issued_books
-from utils.styles import inject_library_styles
 
-st.set_page_config(page_title="Library Card", page_icon="📇", layout="centered")
+DB_PATH = "campus.db"  # change to your database path / connection
 
-render_navbar("Library Card")
-inject_library_styles()
 
-student = get_student_profile()
-issued_count = len(get_issued_books(student["student_id"]))
+# ---------- Data access ----------
+# `username` is a function argument, so each user gets their own cache entry.
+# ttl=30 means data is re-read from the database at most 30 seconds later.
+@st.cache_data(ttl=30)
+def get_student(username: str):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            """
+            SELECT s.id, s.name, s.initials, s.department, s.year,
+                   s.student_id, s.email, s.phone, s.membership_valid_till,
+                   (SELECT COUNT(*) FROM issued_books b
+                     WHERE b.student_id = s.id AND b.returned = 0) AS books_issued
+            FROM students s
+            WHERE s.username = ?
+            """,
+            (username,),
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+# ---------- Page ----------
+st.title("Library Card")
+
+# 1. Make sure someone is logged in
+username = st.session_state.get("username")
+if not username:
+    st.warning("Please log in to view your library card.")
+    st.stop()
+
+# 2. Optional manual refresh button
+if st.button("🔄 Refresh"):
+    st.cache_data.clear()
+    st.rerun()
+
+# 3. Load THIS user's record (no hardcoded ID, no iloc[0])
+student = get_student(username)
+
+if student is None:
+    st.error(f"No student record found for '{username}'.")
+    st.stop()
+
+# 4. Display, with proper label/value separators
+st.subheader(student["name"])
+st.caption(f"ID: {student['id']}")
 
 st.markdown(
     f"""
-    <div class="library-card">
-        <div class="library-card-header">
-            <div>
-                <div style="font-size:1.15rem; font-weight:700;">{student['name']}</div>
-                <div style="opacity:0.75; font-size:0.85rem;">{student['roll_no']}</div>
-            </div>
-            <div class="library-card-avatar">{student['photo_initials']}</div>
-        </div>
-        <div class="library-card-row"><span>Department</span><span>{student['department']}</span></div>
-        <div class="library-card-row"><span>Year</span><span>{student['year']}</span></div>
-        <div class="library-card-row"><span>Student ID</span><span>{student['student_id']}</span></div>
-        <div class="library-card-row"><span>Email</span><span>{student['email']}</span></div>
-        <div class="library-card-row"><span>Phone</span><span>{student['phone']}</span></div>
-        <div class="library-card-row">
-            <span>Membership valid till</span>
-            <span>{student['membership_valid_till'].strftime('%d %b %Y')}</span>
-        </div>
-        <div class="library-card-row" style="border-bottom:none;">
-            <span>Books currently issued</span><span>{issued_count}</span>
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
+**Initials:** {student['initials']}  
+**Department:** {student['department']}  
+**Year:** {student['year']}  
+**Student ID:** {student['student_id']}  
+**Email:** {student['email']}  
+**Phone:** {student['phone']}  
+**Membership valid till:** {student['membership_valid_till']}  
+**Books currently issued:** {student['books_issued']}
+"""
 )
 
-st.caption("This is a digital representation of your library membership card. Show this at the counter if needed.")
+st.caption(
+    "This is a digital representation of your library membership card. "
+    "Show this at the counter if needed."
+)
