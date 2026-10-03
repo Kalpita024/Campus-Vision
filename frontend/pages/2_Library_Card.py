@@ -19,7 +19,7 @@ def get_student(username: str):
                    (SELECT COUNT(*) FROM issued_books b
                      WHERE b.student_id = s.id AND b.returned = 0) AS books_issued
             FROM students s
-            WHERE s.username = ?
+            WHERE s.student_id = ?
             """,
             (username,),
         ).fetchone()
@@ -32,7 +32,7 @@ def get_student(username: str):
 st.title("Library Card")
 
 # 1. Make sure someone is logged in
-username = st.session_state.get("username")
+username = st.session_state.get("student_id")
 if not username:
     st.warning("Please log in to view your library card.")
     st.stop()
