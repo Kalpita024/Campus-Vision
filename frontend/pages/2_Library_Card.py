@@ -1,72 +1,161 @@
 import sqlite3
+from pathlib import Path
 import streamlit as st
 
-DB_PATH = "campus.db"  # change to your database path / connection
+
+# ---------- Database path ----------
+# Use the SAME database as backend/database/db.py
+BASE_DIR = Path(__file__).resolve().parents[2]
+DB_PATH = BASE_DIR / "backend" / "database" / "campusvision.db"
 
 
-# ---------- Data access ----------
-# `username` is a function argument, so each user gets their own cache entry.
-# ttl=30 means data is re-read from the database at most 30 seconds later.
-@st.cache_data(ttl=30)
-def get_student(username: str):
+# ---------- Initialize database ----------
+def init_db():
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS students (
+            student_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            roll_no TEXT,
+            photo_initials TEXT,
+            department TEXT,
+            year TEXT,
+            email TEXT,
+            phone TEXT,
+            membership_valid_till TEXT
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS issued_books (
+            book_id TEXT PRIMARY KEY,
+            student_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            author TEXT,
+            issue_date TEXT NOT NULL,
+            due_date TEXT NOT NULL,
+            renewed INTEGER DEFAULT 0,
+            returned INTEGER DEFAULT 0,
+            FOREIGN KEY (student_id) REFERENCES students (student_id)
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+# Make sure tables exist
+init_db()
+
+
+# ---------- Get student ----------
+def get_student(student_id: str):
+    """Returns (student_dict_or_None, error_message_or_None)."""
     try:
-        row = conn.execute(
-            """
-            SELECT s.id, s.name, s.initials, s.department, s.year,
-                   s.student_id, s.email, s.phone, s.membership_valid_till,
-                   (SELECT COUNT(*) FROM issued_books b
-                     WHERE b.student_id = s.id AND b.returned = 0) AS books_issued
-            FROM students s
-            WHERE s.student_id = ?
-            """,
-            (username,),
-        ).fetchone()
-        return dict(row) if row else None
-    finally:
-        conn.close()
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+
+        try:
+            row = conn.execute(
+                "SELECT * FROM students WHERE student_id = ?",
+                (student_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+
+        return (dict(row) if row else None), None
+
+    except sqlite3.Error as e:
+        return None, str(e)
+
+
+# ---------- Get issued books ----------
+def get_books_issued(student_id: str):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+
+        try:
+            count = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM issued_books
+                WHERE student_id = ?
+                AND returned = 0
+                """,
+                (student_id,),
+            ).fetchone()[0]
+
+        finally:
+            conn.close()
+
+        return count
+
+    except sqlite3.Error:
+        return "-"
 
 
 # ---------- Page ----------
 st.title("Library Card")
 
-# 1. Make sure someone is logged in
-username = st.session_state.get("student_id")
-if not username:
-    st.warning("Please log in to view your library card.")
+
+# 1. Check login
+if not st.session_state.get("logged_in", False):
+    st.warning("Please log in from the main page to view your library card.")
     st.stop()
 
-# 2. Optional manual refresh button
-if st.button("🔄 Refresh"):
-    st.cache_data.clear()
-    st.rerun()
 
-# 3. Load THIS user's record (no hardcoded ID, no iloc[0])
-student = get_student(username)
+student_id = st.session_state.get("student_id", "")
+student_name = st.session_state.get("student_name", "")
 
-if student is None:
-    st.error(f"No student record found for '{username}'.")
-    st.stop()
 
-# 4. Display, with proper label/value separators
-st.subheader(student["name"])
-st.caption(f"ID: {student['id']}")
+# 2. Load student details
+record, error = get_student(student_id)
+record = record or {}
+
+
+# 3. Build card
+name = record.get("name") or student_name
+department = record.get("department", "-")
+year = record.get("year", "-")
+email = record.get("email", "-")
+phone = record.get("phone", "-")
+valid_till = record.get("membership_valid_till", "-")
+
+books_issued = get_books_issued(student_id)
+
+
+# 4. Display card
+st.subheader(name)
+
+st.caption(f"Student ID: {student_id}")
 
 st.markdown(
     f"""
-**Initials:** {student['initials']}  
-**Department:** {student['department']}  
-**Year:** {student['year']}  
-**Student ID:** {student['student_id']}  
-**Email:** {student['email']}  
-**Phone:** {student['phone']}  
-**Membership valid till:** {student['membership_valid_till']}  
-**Books currently issued:** {student['books_issued']}
+**Name:** {name}  
+**Department:** {department}  
+**Year:** {year}  
+**Student ID:** {student_id}  
+**Email:** {email}  
+**Phone:** {phone}  
+**Membership valid till:** {valid_till}  
+**Books currently issued:** {books_issued}
 """
 )
+
 
 st.caption(
     "This is a digital representation of your library membership card. "
     "Show this at the counter if needed."
 )
+
+
+# 5. Helpful messages
+if error:
+    st.info(f"Showing basic details only. Database message: {error}")
+
+elif not record:
+    st.info(
+        "No extra details found for this Student ID in the database yet."
+    )
