@@ -1,5 +1,7 @@
+import os
 import streamlit as st
 from components.navbar import render_navbar
+from services.library_api import get_issued_books, get_due_reminders
 
 # ---------- PAGE CONFIG ----------
 st.set_page_config(
@@ -9,12 +11,16 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-render_navbar()
+render_navbar("Dashboard")
 
 # ---------- LOGIN GUARD ----------
 if not st.session_state.get("logged_in", False):
     st.warning("Please log in first from the Home page.")
     st.stop()
+
+role = st.session_state.get("role", "student")
+is_teacher = role == "teacher"
+FRONTEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # ---------- CUSTOM STYLING (same theme as app.py) ----------
 st.markdown("""
@@ -97,36 +103,79 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+
+def stat_card(label: str, value) -> None:
+    """One small stat box in the theme."""
+    with st.container(border=True):
+        st.markdown(f'<p class="stat-label">{label}</p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="stat-value">{value}</p>', unsafe_allow_html=True)
+
+
+def quick_links(links) -> None:
+    """Show a link only if its page file exists."""
+    for path, label in links:
+        if os.path.exists(os.path.join(FRONTEND_DIR, path)):
+            st.page_link(path, label=label)
+
+
 # ---------- HERO HEADER ----------
+subtitle = "Teacher Dashboard" if is_teacher else "Your Library Dashboard"
 st.markdown(f"""
     <div class="hero">
         <h1>Welcome, {st.session_state.student_name}</h1>
-        <p>Your Library Dashboard</p>
+        <p>{subtitle}</p>
     </div>
 """, unsafe_allow_html=True)
 
-# ---------- STATS ROW ----------
-col1, col2, col3 = st.columns(3)
+# ======================================================================
+# TEACHER VIEW
+# ======================================================================
+if is_teacher:
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        stat_card("Classes Today", "—")
+    with col2:
+        stat_card("Present Today", "—")
+    with col3:
+        stat_card("Defaulters", "—")
 
-with col1:
+    st.write("")
+
     with st.container(border=True):
-        st.markdown('<p class="stat-label">Books Issued</p>', unsafe_allow_html=True)
-        st.markdown('<p class="stat-value">0</p>', unsafe_allow_html=True)
+        st.markdown('<p class="section-title">Quick Access</p>', unsafe_allow_html=True)
+        quick_links([
+            ("pages/4_Take_Attendance.py", "📷  Take Attendance"),
+            ("pages/7_Defaulters.py", "⚠️  View Defaulters"),
+            ("pages/8_Student_Record.py", "🔎  Look up a Student by Roll No."),
+        ])
+        st.info("These numbers will fill in automatically once the attendance pages are connected.")
 
-with col2:
+# ======================================================================
+# STUDENT VIEW
+# ======================================================================
+else:
+    student_id = st.session_state.get("student_id", "")
+    books = get_issued_books(student_id)
+    reminders = get_due_reminders(student_id)
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        stat_card("Books Issued", len(books))
+    with col2:
+        stat_card("Due Soon", len(reminders["upcoming"]))
+    with col3:
+        stat_card("Overdue", len(reminders["overdue"]))
+
+    st.write("")
+
     with st.container(border=True):
-        st.markdown('<p class="stat-label">Due Soon</p>', unsafe_allow_html=True)
-        st.markdown('<p class="stat-value">0</p>', unsafe_allow_html=True)
-
-with col3:
-    with st.container(border=True):
-        st.markdown('<p class="stat-label">Overdue</p>', unsafe_allow_html=True)
-        st.markdown('<p class="stat-value">0</p>', unsafe_allow_html=True)
-
-st.write("")
-
-# ---------- QUICK LINKS SECTION ----------
-with st.container(border=True):
-    st.markdown('<p class="section-title">Quick Access</p>', unsafe_allow_html=True)
-    st.write("Your Library Card and Issued Books sections will appear here once those pages are built.")
-    st.info("This dashboard will automatically update with real data once the library module is connected.")
+        st.markdown('<p class="section-title">Quick Access</p>', unsafe_allow_html=True)
+        quick_links([
+            ("pages/2_Library_Card.py", "📇  My Library Card"),
+            ("pages/3_Issued_Books.py", "📚  My Issued Books"),
+            ("pages/5_Attendance_Status.py", "✅  My Attendance"),
+        ])
+        if reminders["overdue"]:
+            st.warning("You have overdue books. Open Issued Books to renew or return them.")
+        elif reminders["upcoming"]:
+            st.info("Some books are due soon. You can extend them from Issued Books.")
