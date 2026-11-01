@@ -1,6 +1,3 @@
-import sys, os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 import streamlit as st
 from components.navbar import render_navbar
 
@@ -11,6 +8,9 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="collapsed"
 )
+
+# Temporary teacher access code (placeholder until the backend login exists)
+TEACHER_ACCESS_CODE = "teacher123"
 
 render_navbar()
 
@@ -23,7 +23,6 @@ st.markdown("""
         font-family: 'Jost', sans-serif;
     }
 
-    /* Overall background - warm beige */
     .stApp {
         background: #F5F1EA;
     }
@@ -32,7 +31,6 @@ st.markdown("""
         padding-top: 2.5rem;
     }
 
-    /* Header banner */
     .hero {
         background: #FFFFFF;
         padding: 2.6rem 1.5rem 2rem 1.5rem;
@@ -60,7 +58,6 @@ st.markdown("""
         text-transform: uppercase;
     }
 
-    /* Login/content card */
     div[data-testid="stVerticalBlockBorderWrapper"] {
         background: #FFFFFF;
         border-radius: 4px;
@@ -82,7 +79,6 @@ st.markdown("""
         letter-spacing: 0.3px;
     }
 
-    /* Inputs */
     div[data-testid="stTextInput"] input {
         border-radius: 2px;
         border: 1px solid #D8CDB8;
@@ -96,7 +92,8 @@ st.markdown("""
         box-shadow: 0 0 0 1px #A88B5A;
         background-color: #FFFFFF;
     }
-    div[data-testid="stTextInput"] label {
+    div[data-testid="stTextInput"] label,
+    div[data-testid="stRadio"] > label {
         font-weight: 500;
         color: #6B6152;
         font-family: 'Jost', sans-serif;
@@ -105,7 +102,6 @@ st.markdown("""
         text-transform: uppercase;
     }
 
-    /* Buttons */
     .stButton>button {
         width: 100%;
         background: #3B3226;
@@ -125,7 +121,6 @@ st.markdown("""
         color: #FFFFFF;
     }
 
-    /* Metrics */
     div[data-testid="stMetric"] {
         background: #FBF9F5;
         border-radius: 2px;
@@ -145,7 +140,6 @@ st.markdown("""
         font-size: 1.8rem;
     }
 
-    /* Success / info boxes */
     div[data-testid="stAlert"] {
         border-radius: 2px;
         font-family: 'Jost', sans-serif;
@@ -160,6 +154,8 @@ if "student_name" not in st.session_state:
     st.session_state.student_name = ""
 if "student_id" not in st.session_state:
     st.session_state.student_id = ""
+if "role" not in st.session_state:
+    st.session_state.role = ""
 
 # ---------- HERO HEADER ----------
 st.markdown("""
@@ -173,40 +169,58 @@ st.markdown("""
 if not st.session_state.logged_in:
 
     with st.container(border=True):
-        st.markdown('<p class="card-title">Student Login</p>', unsafe_allow_html=True)
-        st.markdown('<p class="card-caption">Enter your details to access the library portal</p>', unsafe_allow_html=True)
+        st.markdown('<p class="card-title">Login</p>', unsafe_allow_html=True)
+        st.markdown('<p class="card-caption">Choose your role and enter your details</p>', unsafe_allow_html=True)
+
+        role = st.radio("I am a", ["Student", "Teacher"], horizontal=True)
 
         name = st.text_input("Full Name", placeholder="e.g. Your name")
-        student_id = st.text_input("Student ID", placeholder="e.g. UMIT2026045")
+
+        if role == "Student":
+            user_id = st.text_input("Student ID", placeholder="e.g. UMIT2026045")
+        else:
+            user_id = st.text_input("Teacher ID", placeholder="e.g. TCH001")
+            access_code = st.text_input("Teacher Access Code", type="password")
 
         login_clicked = st.button("Login")
 
         if login_clicked:
-            if name.strip() and student_id.strip():
+            if not name.strip() or not user_id.strip():
+                st.error("Please enter your name and ID.")
+            elif role == "Teacher" and access_code != TEACHER_ACCESS_CODE:
+                st.error("Incorrect teacher access code.")
+            else:
                 st.session_state.logged_in = True
                 st.session_state.student_name = name.strip()
-                st.session_state.student_id = student_id.strip()
+                st.session_state.student_id = user_id.strip()
+                st.session_state.role = role.lower()
                 st.rerun()
-            else:
-                st.error("Please enter both your name and Student ID.")
 
 # ---------- LOGGED-IN VIEW ----------
 else:
+    is_teacher = st.session_state.role == "teacher"
+
     with st.container(border=True):
         st.markdown(f'<p class="card-title">Welcome back, {st.session_state.student_name}</p>', unsafe_allow_html=True)
         st.markdown('<p class="card-caption">Here\'s your account overview</p>', unsafe_allow_html=True)
 
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("Student ID", st.session_state.student_id)
+            st.metric("Teacher ID" if is_teacher else "Student ID", st.session_state.student_id)
         with col2:
+            st.metric("Role", st.session_state.role.title())
+        with col3:
             st.metric("Status", "Active")
 
         st.divider()
-        st.info("Use the sidebar to navigate to your **Dashboard**, **Library Card**, and **Issued Books**.")
+        if is_teacher:
+            st.info("Use the sidebar to take attendance, view defaulters, and look up a student's record.")
+        else:
+            st.info("Use the sidebar to view your **Dashboard**, **Library Card**, **Issued Books**, and **Attendance**.")
 
         if st.button("Logout"):
             st.session_state.logged_in = False
             st.session_state.student_name = ""
             st.session_state.student_id = ""
+            st.session_state.role = ""
             st.rerun()
