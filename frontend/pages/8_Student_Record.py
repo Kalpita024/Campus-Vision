@@ -1,3 +1,5 @@
+import datetime
+
 import streamlit as st
 from components.navbar import render_navbar
 from services.library_api import (
@@ -6,6 +8,7 @@ from services.library_api import (
     get_book_status,
     days_remaining,
 )
+from services.student_api import get_record_by_roll_no
 
 # ---------- PAGE CONFIG ----------
 st.set_page_config(
@@ -74,14 +77,6 @@ st.markdown("""
         background: #FFFFFF;
         border-radius: 4px;
         border: 1px solid #E4DCCB !important;
-    }
-
-    .section-title {
-        font-family: 'Cormorant Garamond', serif;
-        font-size: 1.4rem;
-        font-weight: 700;
-        color: #3B3226;
-        margin-bottom: 0.6rem;
     }
 
     .student-name {
@@ -168,19 +163,38 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# ---------- LOOKUP HELPER ----------
-def find_student_by_roll_no(roll_no: str):
+# ---------- DATA LOADING ----------
+def load_record(roll_no: str):
     """
-    Return the student whose roll number matches, or None.
+    Find a student by roll number.
 
-    TODO(backend): replace with a real call to the lookup endpoint
-    (roll no. -> student), once routes/student_routes.py exists.
-    For now only the one dummy student in library_api.py can be found.
+    Returns (student, books, attendance_records, error_message).
+    Uses the backend when connected; falls back to the dummy data
+    from library_api.py when the backend is not reachable.
     """
+    token = st.session_state.get("token", "")
+
+    if st.session_state.get("backend_mode") and token:
+        record, error, offline = get_record_by_roll_no(roll_no, token)
+
+        if record is not None:
+            books = []
+            for b in record["library"]["issued_books"]:
+                b = dict(b)
+                b["issue_date"] = datetime.date.fromisoformat(b["issue_date"])
+                b["due_date"] = datetime.date.fromisoformat(b["due_date"])
+                books.append(b)
+            return record["student"], books, record["attendance"]["records"], None
+
+        if not offline:
+            return None, [], [], error
+        # backend unreachable: fall through to demo data
+
+    # ---------- DEMO DATA ----------
     student = get_student_profile()
     if student["roll_no"].strip() == roll_no.strip():
-        return student
-    return None
+        return student, get_issued_books(student["student_id"]), [], None
+    return None, [], [], f"No student found with roll number {roll_no}."
 
 
 # ---------- HERO HEADER ----------
@@ -208,10 +222,10 @@ searched_roll_no = st.session_state.get("record_roll_no", "")
 
 # ---------- RESULTS ----------
 if searched_roll_no:
-    student = find_student_by_roll_no(searched_roll_no)
+    student, books, attendance_records, error = load_record(searched_roll_no)
 
     if student is None:
-        st.error(f"No student found with roll number {searched_roll_no}.")
+        st.error(error)
     else:
         st.write("")
 
@@ -233,8 +247,6 @@ if searched_roll_no:
 
         # ---------- LIBRARY TAB ----------
         with tab_library:
-            books = get_issued_books(student["student_id"])
-
             if not books:
                 st.info("This student has no books currently issued.")
             else:
@@ -262,7 +274,12 @@ if searched_roll_no:
 
         # ---------- ATTENDANCE TAB ----------
         with tab_attendance:
-            st.info(
-                "Attendance records will appear here once the attendance module is connected "
-                "(attendance %, dates present, and exam eligibility)."
-            )
+            if not attendance_records:
+                st.info(
+                    "No attendance has been recorded for this student yet. "
+                    "Records will appear here once attendance is taken."
+                )
+            else:
+                present = sum(1 for r in attendance_records if r["status"] == "present")
+                st.caption(f"{present} present out of {len(attendance_records)} recorded")
+                st.dataframe(attendance_records, hide_index=True, use_container_width=True)
