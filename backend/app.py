@@ -1,14 +1,24 @@
-﻿from flask import Flask
+﻿import os
+
+from flask import Flask
+
 from database.db import init_db, db
 from routes.library_routes import library_bp
+from routes.auth_routes import auth_bp
+from routes.student_routes import student_bp
 
 app = Flask(__name__)
+
+# Signs login tokens. Set a real value in production, never commit it.
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-only-change-me")
 
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///campusvision.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 
 app.register_blueprint(library_bp)
+app.register_blueprint(auth_bp)
+app.register_blueprint(student_bp)
 
 
 @app.route("/")
