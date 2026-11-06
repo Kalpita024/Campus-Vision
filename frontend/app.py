@@ -1,5 +1,6 @@
 import streamlit as st
 from components.navbar import render_navbar
+from services.auth_api import login
 
 # ---------- PAGE CONFIG ----------
 st.set_page_config(
@@ -9,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Temporary teacher access code (placeholder until the backend login exists)
+# Only used in demo mode, when the backend server is not reachable
 TEACHER_ACCESS_CODE = "teacher123"
 
 render_navbar()
@@ -148,14 +149,17 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------- SESSION STATE ----------
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "student_name" not in st.session_state:
-    st.session_state.student_name = ""
-if "student_id" not in st.session_state:
-    st.session_state.student_id = ""
-if "role" not in st.session_state:
-    st.session_state.role = ""
+defaults = {
+    "logged_in": False,
+    "student_name": "",
+    "student_id": "",
+    "role": "",
+    "token": "",
+    "backend_mode": False,
+}
+for key, value in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 # ---------- HERO HEADER ----------
 st.markdown("""
@@ -176,25 +180,46 @@ if not st.session_state.logged_in:
 
         name = st.text_input("Full Name", placeholder="e.g. Your name")
 
+        access_code = ""
         if role == "Student":
             user_id = st.text_input("Student ID", placeholder="e.g. UMIT2026045")
         else:
             user_id = st.text_input("Teacher ID", placeholder="e.g. TCH001")
-            access_code = st.text_input("Teacher Access Code", type="password")
+            access_code = st.text_input("Password", type="password")
 
         login_clicked = st.button("Login")
 
         if login_clicked:
             if not name.strip() or not user_id.strip():
                 st.error("Please enter your name and ID.")
-            elif role == "Teacher" and access_code != TEACHER_ACCESS_CODE:
-                st.error("Incorrect teacher access code.")
             else:
-                st.session_state.logged_in = True
-                st.session_state.student_name = name.strip()
-                st.session_state.student_id = user_id.strip()
-                st.session_state.role = role.lower()
-                st.rerun()
+                result, error, offline = login(role.lower(), user_id.strip(), access_code)
+
+                if result is not None:
+                    # Logged in through the backend
+                    st.session_state.logged_in = True
+                    st.session_state.student_name = result["name"]
+                    st.session_state.student_id = result["user_id"]
+                    st.session_state.role = result["role"]
+                    st.session_state.token = result["token"]
+                    st.session_state.backend_mode = True
+                    st.rerun()
+
+                elif offline:
+                    # Backend not running: demo mode with the old local check
+                    if role == "Teacher" and access_code != TEACHER_ACCESS_CODE:
+                        st.error("Incorrect teacher password.")
+                    else:
+                        st.session_state.logged_in = True
+                        st.session_state.student_name = name.strip()
+                        st.session_state.student_id = user_id.strip()
+                        st.session_state.role = role.lower()
+                        st.session_state.token = ""
+                        st.session_state.backend_mode = False
+                        st.rerun()
+
+                else:
+                    st.error(error)
 
 # ---------- LOGGED-IN VIEW ----------
 else:
@@ -218,9 +243,10 @@ else:
         else:
             st.info("Use the sidebar to view your **Dashboard**, **Library Card**, **Issued Books**, and **Attendance**.")
 
+        if not st.session_state.backend_mode:
+            st.caption("Demo mode: the backend server is not connected.")
+
         if st.button("Logout"):
-            st.session_state.logged_in = False
-            st.session_state.student_name = ""
-            st.session_state.student_id = ""
-            st.session_state.role = ""
+            for key, value in defaults.items():
+                st.session_state[key] = value
             st.rerun()
