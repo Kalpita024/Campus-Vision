@@ -31,9 +31,15 @@ FACE_SIZE = (200, 200)
 # Increase if real students are shown as "Unknown", decrease if strangers get matched.
 CONFIDENCE_THRESHOLD = 70.0
 
-_detector = cv2.CascadeClassifier(
-    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-)
+# Load Haar Cascade from the project's data folder
+CASCADE_PATH = DATA_DIR / "haarcascade_frontalface_default.xml"
+
+_detector = cv2.CascadeClassifier(str(CASCADE_PATH))
+
+if _detector.empty():
+    raise FileNotFoundError(
+        f"Could not load Haar Cascade XML file: {CASCADE_PATH}"
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -41,10 +47,22 @@ _detector = cv2.CascadeClassifier(
 # --------------------------------------------------------------------------- #
 def detect_faces(bgr_image):
     """Return list of (x, y, w, h) face boxes found in a BGR image."""
+
+    if bgr_image is None:
+        raise ValueError("Invalid image provided for face detection.")
+
+    if _detector.empty():
+        raise RuntimeError("Haar Cascade detector is not loaded.")
+
     gray = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2GRAY)
+
     faces = _detector.detectMultiScale(
-        gray, scaleFactor=1.2, minNeighbors=5, minSize=(60, 60)
+        gray,
+        scaleFactor=1.2,
+        minNeighbors=5,
+        minSize=(60, 60)
     )
+
     return [tuple(int(v) for v in f) for f in faces]
 
 
