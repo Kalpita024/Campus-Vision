@@ -19,11 +19,11 @@ from services.face_recognition import FaceRecognizer
 st.set_page_config(page_title="Take Attendance", page_icon="📸", layout="wide")
 
 # --------------------------- Role guard (from app.py) ----------------------- #
-# app.py should set:  st.session_state["role"] = "Teacher"  or  "Student"
-if st.session_state.get("role") != "Teacher":
+# Only teachers are allowed to take attendance.
+
+if str(st.session_state.get("role", "")).strip().lower() != "teacher":
     st.warning("Only teachers can take attendance. Please log in as a Teacher.")
     st.stop()
-
 # Optional: if your components/navbar.py exposes a function, call it here, e.g.
 # from components.navbar import render_navbar
 # render_navbar()
@@ -32,7 +32,7 @@ st.title("📸 Take Attendance")
 
 
 # ------------------------------- Cached model ------------------------------- #
-@st.cache_resource
+@st.cache_resourcepython 
 def load_recognizer(_version: int):
     return FaceRecognizer()
 

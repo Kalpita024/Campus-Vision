@@ -200,7 +200,7 @@ if not st.session_state.logged_in:
                     st.session_state.logged_in = True
                     st.session_state.student_name = result["name"]
                     st.session_state.student_id = result["user_id"]
-                    st.session_state.role = result["role"]
+                    st.session_state.role = str(result["role"]).strip().lower()
                     st.session_state.token = result["token"]
                     st.session_state.backend_mode = True
                     st.rerun()
