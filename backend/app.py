@@ -6,6 +6,7 @@ from database.db import init_db, db
 from routes.library_routes import library_bp
 from routes.auth_routes import auth_bp
 from routes.student_routes import student_bp
+from routes.defaulter_routes import defaulter_bp
 
 app = Flask(__name__)
 
@@ -19,6 +20,7 @@ db.init_app(app)
 app.register_blueprint(library_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(student_bp)
+app.register_blueprint(defaulter_bp)
 
 
 @app.route("/")
