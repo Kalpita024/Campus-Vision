@@ -32,7 +32,7 @@ st.title("📸 Take Attendance")
 
 
 # ------------------------------- Cached model ------------------------------- #
-@st.cache_resourcepython 
+@st.cache_resource
 def load_recognizer(_version: int):
     return FaceRecognizer()
 
