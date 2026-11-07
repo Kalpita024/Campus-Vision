@@ -14,6 +14,7 @@ import numpy as np
 import streamlit as st
 
 from services import attendance_api
+from services.backend_attendance import push_attendance
 from services.face_recognition import FaceRecognizer
 
 st.set_page_config(page_title="Take Attendance", page_icon="📸", layout="wide")
@@ -153,8 +154,28 @@ with right:
                 sid: attendance_api.PRESENT if st.session_state[f"chk_{sid}"] else attendance_api.ABSENT
                 for sid in student_ids
             }
+            # 1) Always save locally so the page works without the backend
             attendance_api.mark_attendance(class_name, subject.strip(), records, on_date)
             st.success(
                 f"Attendance saved for {class_name} – {subject} on {on_date.isoformat()} "
                 f"({present_count} present, {len(student_ids) - present_count} absent)."
             )
+
+            # 2) Also send to the backend (Student Record + defaulters read from there)
+            token = st.session_state.get("token")
+            if st.session_state.get("backend_mode") and token:
+                summary, error, offline = push_attendance(
+                    token, subject.strip(), on_date.isoformat(), records
+                )
+                if offline:
+                    st.warning("Saved locally, but the backend server isn't running, "
+                               "so Student Record won't show it yet.")
+                elif error:
+                    st.warning(f"Saved locally, but the backend said: {error}")
+                else:
+                    st.success(f"Synced to backend: {summary['saved']} records.")
+                    if summary["not_found"]:
+                        st.info("Not found in the backend student list (skipped): "
+                                + ", ".join(summary["not_found"]))
+            else:
+                st.info("Demo mode: saved on this device only (not sent to the backend).")
